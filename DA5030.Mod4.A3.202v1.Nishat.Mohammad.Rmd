@@ -1,0 +1,237 @@
+---
+title: "Practice KNN A3.202-v1"
+author: Dr. Nishat Mohammad
+date: 01/24/2024
+output:
+  pdf_document:
+    latex_engine: xelatex
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+## Task 1: Loading Prostate Cancer Dataset
+Download the data set for the tutorial and save it in your project folder.  
+
+```{r}
+# Load data to variable
+prsca_data1 <- (read.csv("Prostate_Cancer.csv", stringsAsFactors = FALSE))
+
+# Look at the data
+str(prsca_data1)
+
+# Check dimensions
+dim(prsca_data1)
+
+# Check for missing values
+any(is.na(prsca_data1))
+# FALSE means there are no missing values!
+
+```
+## Task 2:
+Follow this tutorial on applying kNN to prostate cancer detection and implement all of the steps in your R Notebook. Use appropriate headers to each step to structure your notebook. Make sure to explain each step and what it does. (Note: The data set provided as part of this assignment has been slightly modified from the one used in the tutorial, so small deviations in the result can be expected.).  
+
+### Take off the id column
+```{r ID_Off}
+# Take the id  column (first column) out of the data frame
+prsca_data1 <- prsca_data1[-1]
+
+# Look at the editted data 
+str(prsca_data1)
+
+```
+The ID column has been removed leaving us with 9 variables.
+
+### Factor for Beingn and Malignant Tumor Catogories
+```{r}
+# Factoring step
+prsca_data1$diagnoses <- factor(prsca_data1$diagnosis_result, levels = c("B", "M"), labels = c("Benign", "Malignant"))
+#str(prsca_data1)
+
+# Get the percentages
+round(prop.table(table(prsca_data1$diagnosis)) * 100, digits = 1)
+
+```
+This shows that Benign tumors contribute to 38% of the observations while malignant contribute to 68% of the observations.  
+
+### Normalizing numeric data
+From the structure we can see the  that 1st to 4th columns are integers and 5th to 8th columns are numeric.  
+```{r Summary of data}
+# Check the summary of the data except the first and last columns
+summary(prsca_data1[2:9])
+```
+This give me a quick look at all the statistics.  
+
+```{r Normalization}
+# Make a function
+nrm <- function(x) {
+return ((x - min(x)) / (max(x) - min(x)))
+}
+
+# Normalize
+prsca_data_nrm <- as.data.frame(lapply(prsca_data1[2:9], nrm))
+str(prsca_data_nrm)
+summary(prsca_data_nrm$perimeter)
+```
+Now all the columns are numeric and values normalized. I checked the perimeter summary, values are normalized.   
+
+###  Creating Training and Test Data Set
+This will be done with ratio of 65 for training and 35 for test data.  
+
+```{r test_train_sets}
+# divide the data set into 2 portions
+# in the ratio of 65: 35 (assumed) 
+# for the training and test data set respectively
+training_set <- prsca_data_nrm[1:65,]
+test_set <- prsca_data_nrm[66:100,]
+
+```
+  
+  
+Now I will add labels for the training and test sets
+```{r add_labels}
+# Make the labels in accordance with the diagnosis_result column (column 1)
+
+training_labels <- prsca_data1[1:65, 1]
+testing_labels <- prsca_data1[66:100, 1]
+```
+
+### Training a model on data
+```{r}
+library(class)
+# Get value of k
+#nrow(prsca_data1)
+K <- sqrt(nrow(prsca_data1))
+#any(is.na(prsca_data1))
+# apply knn() function
+test_knn_prediction <- knn(train = training_set, test = test_set, cl = training_labels, k= K)
+
+
+```
+Here, I found the k by taking the square root of the total number of observations. k is 10 form the 100 observations in this dataset.  
+I applied the knn function here using the both sets and the labels of the training set with k of 10. Now let us evaluate the model.  
+
+
+### Evaluate the model performance
+```{r}
+library(gmodels)
+
+# use the cross table
+prsc_cros_table <- CrossTable(
+  x = testing_labels,
+  y = test_knn_prediction,
+  prop.chisq=FALSE)
+```
+The Cross table above shows the prediction of cancer samples in the data set provided.  
+There are a total of 19 benign observations in the test set, out of these our model predicted 7 correctly (true positive) and 12 incorrectly as malignant (false negative).    
+There are total of 16 malignant observations in the test set, out of there our model predicted 15 correctly (true negative) and 1 incorrectly as benign (false positive).  
+
+The overall accuracy of the model on the test set is the percentage of sum of true events fraction which is 7+ 15 divide by 35 which is  approximately 62.9%. This is the precision of the model.  
+
+
+### Fluctuate the value of K around 10 to check for better accuracy:  
+
+```{r k11model}
+K11 <- 11
+test_knn_prediction_k11 <- knn(train = training_set, test = test_set, cl = training_labels, k= K11)
+prsc_cros_table_k11 <- CrossTable(
+  x = testing_labels,
+  y = test_knn_prediction_k11,
+  prop.chisq=FALSE)
+```
+
+From this cross table we can see the true event fraction reduce to (5+16)/35  which is 60.0% this is the accuracy or precision of the model
+
+```{r k9model}
+K9 <- 9
+test_knn_prediction_k9 <- knn(train = training_set, test = test_set, cl = training_labels, k= K9)
+prsc_cros_table_k9 <- CrossTable(
+  x = testing_labels,
+  y = test_knn_prediction_k9,
+  prop.chisq=FALSE)
+```
+
+For this model we can see that the true event fraction is increased to (8 + 16)/35  which is 68.6% accuracy.
+
+My conclusion is that the knn model will be more accurate if k is reduced. but the value of k should be carefully decided in order not to leave out some trivial patterns which may be equally important for later interpretation.
+
+## Task 3:
+Once you’ve complete the tutorial, try another kNN implementation from another package, such as the caret package. Compare the accuracy of the two implementations.  
+
+```{r KNN_with_caret }
+# Load data 
+p_df <- read.csv("Prostate_Cancer.csv",stringsAsFactors=FALSE)
+str(p_df)
+# Take off id column
+p_df <- p_df[-1]
+
+# Load caret package
+library(caret)
+
+# For reproducibility
+set.seed(786)
+
+# Train and test sets
+caret_training_set <- createDataPartition(y = p_df$diagnosis_result, p= 0.64, list = FALSE)
+train_df <- p_df[caret_training_set,]
+
+testing_df <- p_df[-caret_training_set,]
+
+# Factor the data according to tumor categories benign and malignant
+train_df[["diagnosis_result"]] = factor(train_df[["diagnosis_result"]])
+testing_df[["diagnosis_result"]] = factor(testing_df[["diagnosis_result"]])
+
+
+# Normalize and Train the model
+#?trainControl
+train_control <- trainControl(method = "repeatedcv", number=10, repeats = 3)
+
+knn_pred_model <- train(diagnosis_result ~., data = train_df, method = "knn",
+                 trControl=train_control,
+                 preProcess = c("center", "scale"),
+                 tuneLength = 20)
+knn_pred_model
+# Visualize the prediction
+plot(knn_pred_model)
+
+# Use the model on test set
+knn_test_pred <- predict(knn_pred_model, newdata = testing_df)
+
+```
+
+## Task 4:
+Use the confusionMatrix() function from the caret package to determine the accuracy of both algorithms.  
+
+```{r confusion_matrix}
+
+# test  the knn from caret package
+length(testing_df$diagnosis_result)
+length(knn_test_pred)
+
+confusionMatrix(table(knn_test_pred, testing_df$diagnosis_result))
+```
+The accuracy of the KNN model using caret is 0.8571 when considering the benign Class is the positive class. 
+
+```{r confusion_matrix_class}
+confusionMatrix(table(knn_test_pred, testing_labels))
+```
+The accuracy of this model is 0.28.  
+Comparing the accuracy of both models, the knn by the caret package has a higher accuracy.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
